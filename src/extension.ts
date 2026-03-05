@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { Keychain } from './keychain';
 import { StatusBar } from './statusBar';
 import { SidebarProvider } from './sidebarProvider';
-import { FastAutocompleteInlineProvider, initCompletionHandler, trigger, accept, dismiss, hasPending } from './completionHandler';
+import { FastAutocompleteInlineProvider, initCompletionHandler, trigger, accept, dismiss, hasPending, isStreaming } from './completionHandler';
 import { Config } from './config';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -11,6 +11,14 @@ export function activate(context: vscode.ExtensionContext): void {
     Keychain.initialize(context.secrets);
     StatusBar.initialize(context);
     initCompletionHandler(context);
+
+    // Keep fastAutocomplete.streaming context key in sync so spacebar when-clause works
+    const updateStreamingContext = () =>
+        vscode.commands.executeCommand('setContext', 'fastAutocomplete.streaming', isStreaming());
+
+    context.subscriptions.push(
+        vscode.window.onDidChangeTextEditorSelection(() => updateStreamingContext()),
+    );
 
     // Inline completion provider
     context.subscriptions.push(

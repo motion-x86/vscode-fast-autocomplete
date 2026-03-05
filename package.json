@@ -79,6 +79,11 @@
                 "when": "inlineSuggestionVisible && !editorReadonly"
             },
             {
+                "command": "fastAutocomplete.accept",
+                "key": "space",
+                "when": "inlineSuggestionVisible && !editorReadonly && fastAutocomplete.streaming"
+            },
+            {
                 "command": "editor.action.inlineSuggest.hide",
                 "key": "escape",
                 "when": "inlineSuggestionVisible"
@@ -205,6 +210,14 @@
                     "description": "Log verbose request/response details to the output channel."
                 }
             }
+        },
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "fastAutocomplete.accept",
+                    "when": "inlineSuggestionVisible"
+                }
+            ]
         }
     },
     "scripts": {
