@@ -1,0 +1,224 @@
+{
+    "name": "fast-autocomplete",
+    "displayName": "Fast Autocomplete",
+    "description": "AI-powered inline ghost text completions via Claude and OpenAI",
+    "version": "0.1.0",
+    "publisher": "motion-x86",
+    "engines": {
+        "vscode": "^1.82.0"
+    },
+    "categories": [
+        "AI",
+        "Other"
+    ],
+    "keywords": [
+        "ai",
+        "autocomplete",
+        "claude",
+        "openai",
+        "ghost text",
+        "copilot"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "icon": "images/icon.png",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/your-org/vscode-fast-autocomplete"
+    },
+    "contributes": {
+        "commands": [
+            {
+                "command": "fastAutocomplete.trigger",
+                "title": "FastAutocomplete: Trigger Completion"
+            },
+            {
+                "command": "fastAutocomplete.accept",
+                "title": "FastAutocomplete: Accept Completion"
+            },
+            {
+                "command": "fastAutocomplete.dismiss",
+                "title": "FastAutocomplete: Dismiss Completion"
+            },
+            {
+                "command": "fastAutocomplete.next",
+                "title": "FastAutocomplete: Next Completion (Alternative)"
+            },
+            {
+                "command": "fastAutocomplete.setApiKey.claude",
+                "title": "FastAutocomplete: Set API Key (Claude)"
+            },
+            {
+                "command": "fastAutocomplete.setApiKey.openai",
+                "title": "FastAutocomplete: Set API Key (OpenAI)"
+            },
+            {
+                "command": "fastAutocomplete.selectProvider",
+                "title": "FastAutocomplete: Select Provider"
+            },
+            {
+                "command": "fastAutocomplete.toggleStreaming",
+                "title": "FastAutocomplete: Toggle Streaming"
+            },
+            {
+                "command": "fastAutocomplete.resetPrompts",
+                "title": "FastAutocomplete: Reset Prompts to Default"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "fastAutocomplete.trigger",
+                "key": "ctrl+space",
+                "when": "editorTextFocus && !editorReadonly"
+            },
+            {
+                "command": "editor.action.inlineSuggest.commit",
+                "key": "tab",
+                "when": "inlineSuggestionVisible && !editorReadonly"
+            },
+            {
+                "command": "editor.action.inlineSuggest.hide",
+                "key": "escape",
+                "when": "inlineSuggestionVisible"
+            },
+            {
+                "command": "fastAutocomplete.next",
+                "key": "ctrl+shift+n",
+                "when": "inlineSuggestionVisible && editorTextFocus"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "fastAutocomplete",
+                    "title": "Fast Autocomplete",
+                    "icon": "images/icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "fastAutocomplete": [
+                {
+                    "type": "webview",
+                    "id": "fastAutocomplete.sidebar",
+                    "name": "Fast Autocomplete"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "Fast Autocomplete",
+            "properties": {
+                "fastAutocomplete.provider": {
+                    "type": "string",
+                    "default": "claude",
+                    "enum": [
+                        "claude",
+                        "openai"
+                    ],
+                    "description": "AI provider to use for completions."
+                },
+                "fastAutocomplete.model": {
+                    "type": "string",
+                    "default": "claude-sonnet-4-20250514",
+                    "description": "Model identifier for the selected provider."
+                },
+                "fastAutocomplete.maxCompletionTokens": {
+                    "type": "number",
+                    "default": 128,
+                    "minimum": 1,
+                    "maximum": 4096,
+                    "description": "Maximum tokens per completion response."
+                },
+                "fastAutocomplete.contextLinesBefore": {
+                    "type": "number",
+                    "default": 50,
+                    "minimum": 0,
+                    "maximum": 500,
+                    "description": "Lines of code above cursor sent as prefix context."
+                },
+                "fastAutocomplete.contextLinesAfter": {
+                    "type": "number",
+                    "default": 10,
+                    "minimum": 0,
+                    "maximum": 500,
+                    "description": "Lines of code below cursor sent as suffix context."
+                },
+                "fastAutocomplete.streaming": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Stream tokens as they arrive."
+                },
+                "fastAutocomplete.systemPrompt": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Override the system prompt. Leave empty to use the built-in default."
+                },
+                "fastAutocomplete.completionInstruction": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Override the completion instruction. Supports {language}, {file_name}, {file_name_clause}. Leave empty to use the built-in default."
+                },
+                "fastAutocomplete.alternateInstruction": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Override the alternate completion instruction. Same placeholders as completionInstruction. Leave empty to use the built-in default."
+                },
+                "fastAutocomplete.requestTimeoutSeconds": {
+                    "type": "number",
+                    "default": 10,
+                    "minimum": 1,
+                    "maximum": 60,
+                    "description": "Timeout in seconds for completion requests."
+                },
+                "fastAutocomplete.maxRetries": {
+                    "type": "number",
+                    "default": 2,
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Number of times to retry failed requests."
+                },
+                "fastAutocomplete.privacy.redactComments": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Strip comments from context before sending to the API."
+                },
+                "fastAutocomplete.privacy.redactStringLiterals": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Replace string literal contents with a placeholder before sending."
+                },
+                "fastAutocomplete.privacy.noRetention": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Request that the provider does not use this request for model training."
+                },
+                "fastAutocomplete.privacy.redactPatterns": {
+                    "type": "array",
+                    "default": [],
+                    "description": "Custom redaction rules. Each entry is a string (literal) or object with 'pattern', 'replacement', 'flags'."
+                },
+                "fastAutocomplete.debug": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Log verbose request/response details to the output channel."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "lint": "eslint src --ext ts"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "@types/vscode": "^1.82.0",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.0.0",
+        "typescript": "^5.0.0"
+    }
+}
