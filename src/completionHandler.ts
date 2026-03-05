@@ -21,6 +21,7 @@ let _pending:         PendingCompletion | null = null;
 let _abortController: AbortController   | null = null;
 let _streaming:       boolean                  = false;
 let _outputChannel:   vscode.OutputChannel;
+let _suppressDismiss: boolean = false; // suppresses dismiss during re-trigger
 
 function setCtx(key: string, value: boolean): void {
     vscode.commands.executeCommand('setContext', key, value);
@@ -55,14 +56,14 @@ export function initCompletionHandler(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         vscode.window.onDidChangeTextEditorSelection(e => {
-            if (!_pending) return;
+            if (_suppressDismiss || !_pending) return;
             const pos = e.selections[0]?.active;
             if (!pos || !pos.isEqual(_pending.position)) {
                 dismiss();
             }
         }),
         vscode.workspace.onDidChangeTextDocument(e => {
-            if (!_pending) return;
+            if (_suppressDismiss || !_pending) return;
             if (e.document.uri.toString() === _pending.document.uri.toString()) {
                 dismiss();
             }
@@ -74,7 +75,18 @@ export async function trigger(alternate = false): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
 
-    cancel();
+    // Cancel in-flight request and clear existing ghost text.
+    // Suppress dismiss listener while hiding so the selection event
+    // from inlineSuggest.hide doesn't cancel the new request.
+    _suppressDismiss = true;
+    _abortController?.abort();
+    _abortController = null;
+    _streaming = false;
+    _pending   = null;
+    setCtx('fastAutocomplete.pending', false);
+    setCtx('fastAutocomplete.streaming', false);
+    await vscode.commands.executeCommand('editor.action.inlineSuggest.hide');
+    _suppressDismiss = false;
 
     const provider = await getProvider();
     if (!provider) return;
