@@ -227,7 +227,6 @@ export class FastAutocompleteInlineProvider implements vscode.InlineCompletionIt
                     new vscode.Range(position, position),
                 ),
             ],
-            suppressSuggestions: true,
         };
     }
 }
