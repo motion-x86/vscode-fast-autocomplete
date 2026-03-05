@@ -81,7 +81,7 @@
             {
                 "command": "fastAutocomplete.accept",
                 "key": "space",
-                "when": "inlineSuggestionVisible && !editorReadonly && fastAutocomplete.streaming"
+                "when": "inlineSuggestionVisible && fastAutocomplete.streaming && !editorReadonly"
             },
             {
                 "command": "editor.action.inlineSuggest.hide",

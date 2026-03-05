@@ -22,9 +22,9 @@ let _abortController: AbortController   | null = null;
 let _streaming:       boolean                  = false;
 let _outputChannel:   vscode.OutputChannel;
 
-// Fires to re-query inline completions without triggering the full suggest
-// flow — no flicker during streaming updates
-const _onDidChange = new vscode.EventEmitter<void>();
+function setCtx(key: string, value: boolean): void {
+    vscode.commands.executeCommand('setContext', key, value);
+}
 
 // ---------------------------------------------------------------------------
 // Provider factory
@@ -80,44 +80,50 @@ export async function trigger(alternate = false): Promise<void> {
     if (!provider) return;
 
     const position  = editor.selection.active;
-    const context   = buildContext(editor.document, position);
+    const ctx       = buildContext(editor.document, position);
     const maxTokens = Config.maxCompletionTokens();
 
     _abortController = new AbortController();
     const signal     = _abortController.signal;
     StatusBar.setState('requesting');
 
-    // Seed pending so the provider is active before first chunk arrives
-    _pending = { text: '', position, document: editor.document };
-    await vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
-
     try {
         if (Config.streaming()) {
             _streaming = true;
-            vscode.commands.executeCommand('setContext', 'fastAutocomplete.streaming', true);
+            setCtx('fastAutocomplete.streaming', true);
             let accumulated = '';
 
-            for await (const chunk of provider.completeStream(context, maxTokens, alternate)) {
+            for await (const chunk of provider.completeStream(ctx, maxTokens, alternate)) {
                 if (signal.aborted) return;
                 accumulated += chunk;
-                _updatePending(editor.document, position, accumulated);
+
+                // Update pending in place — the provider returns latest text
+                // on its next poll without re-triggering the suggestion widget
+                _pending = { text: accumulated, position, document: editor.document };
+                setCtx('fastAutocomplete.pending', true);
+                StatusBar.setState('requesting');
             }
 
             _streaming = false;
-            vscode.commands.executeCommand('setContext', 'fastAutocomplete.streaming', false);
+            setCtx('fastAutocomplete.streaming', false);
             if (signal.aborted) return;
 
             if (accumulated) {
+                // Trigger once at the end so the final complete ghost text renders
+                await vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
                 StatusBar.setState('visible');
             } else {
                 dismiss();
             }
 
         } else {
-            const text = await provider.complete(context, maxTokens, alternate);
+            const text = await provider.complete(ctx, maxTokens, alternate);
             if (signal.aborted) return;
+
             if (text) {
-                _updatePending(editor.document, position, text);
+                _pending = { text, position, document: editor.document };
+                setCtx('fastAutocomplete.pending', true);
+                await vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
                 StatusBar.setState('visible');
             } else {
                 dismiss();
@@ -132,7 +138,7 @@ export async function trigger(alternate = false): Promise<void> {
 
     } catch (err) {
         _streaming = false;
-        vscode.commands.executeCommand('setContext', 'fastAutocomplete.streaming', false);
+        setCtx('fastAutocomplete.streaming', false);
         dismiss();
         handleError(err);
     }
@@ -143,31 +149,30 @@ export async function accept(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
 
-    // Cancel stream and accept whatever arrived so far
     if (_streaming) {
         cancel();
         _streaming = false;
+        setCtx('fastAutocomplete.streaming', false);
     }
 
     const { text, position } = _pending;
     if (!text) { dismiss(); return; }
 
     _pending = null;
-    _onDidChange.fire();
+    setCtx('fastAutocomplete.pending', false);
 
-    await editor.edit(editBuilder => {
-        editBuilder.insert(position, text);
-    });
-
+    await vscode.commands.executeCommand('editor.action.inlineSuggest.hide');
+    await editor.edit(eb => eb.insert(position, text));
     StatusBar.setState('idle');
 }
 
 export function dismiss(): void {
     _streaming = false;
-    vscode.commands.executeCommand('setContext', 'fastAutocomplete.streaming', false);
     _pending   = null;
     cancel();
-    _onDidChange.fire();
+    setCtx('fastAutocomplete.pending', false);
+    setCtx('fastAutocomplete.streaming', false);
+    vscode.commands.executeCommand('editor.action.inlineSuggest.hide');
     StatusBar.setState('idle');
 }
 
@@ -187,47 +192,30 @@ export function isStreaming(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Internal
-// ---------------------------------------------------------------------------
-
-function _updatePending(
-    document: vscode.TextDocument,
-    position: vscode.Position,
-    text: string,
-): void {
-    _pending = { text, position, document };
-    _onDidChange.fire();
-}
-
-// ---------------------------------------------------------------------------
 // InlineCompletionItemProvider
 // ---------------------------------------------------------------------------
 
 export class FastAutocompleteInlineProvider implements vscode.InlineCompletionItemProvider {
 
-    onDidChangeInlineCompletionItems = _onDidChange.event;
-
     provideInlineCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-    ): vscode.InlineCompletionList | null {
+    ): vscode.InlineCompletionItem[] {
         if (
             !_pending ||
             !_pending.text ||
             _pending.document.uri.toString() !== document.uri.toString() ||
             !position.isEqual(_pending.position)
         ) {
-            return null;
+            return [];
         }
 
-        return {
-            items: [
-                new vscode.InlineCompletionItem(
-                    _pending.text,
-                    new vscode.Range(position, position),
-                ),
-            ],
-        };
+        return [
+            new vscode.InlineCompletionItem(
+                _pending.text,
+                new vscode.Range(position, position),
+            ),
+        ];
     }
 }
 
